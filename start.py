@@ -9,6 +9,7 @@ import os
 import sys
 import subprocess
 import platform
+import socket
 from pathlib import Path
 
 def get_venv_path():
@@ -22,6 +23,20 @@ def get_venv_path():
         return None
     
     return venv_path
+
+def find_available_port(start_port=8501, max_port=8600):
+    """查找可用端口"""
+    for port in range(start_port, max_port + 1):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.1)
+            result = sock.connect_ex(('localhost', port))
+            sock.close()
+            if result != 0:  # 端口未被占用
+                return port
+        except Exception:
+            continue
+    return None
 
 def get_activate_script_path(venv_path):
     """获取激活脚本路径（跨平台）"""
@@ -66,19 +81,35 @@ def activate_venv_and_run():
         if not install_dependencies():
             return False
     
+    # 查找可用端口
+    print("🔍 正在查找可用端口...")
+    available_port = find_available_port()
+    
+    if not available_port:
+        print("❌ 在8501-8600范围内未找到可用端口")
+        return False
+    
+    print(f"✅ 找到可用端口: {available_port}")
+    
     print(f"🚀 正在启动AI数据集蒸馏工厂...")
     print(f"📁 项目路径: {os.path.dirname(os.path.abspath(__file__))}")
     print(f"🐍 Python版本: {sys.version}")
     print(f"🌐 虚拟环境: {venv_path}")
+    print(f"🌐 服务端口: {available_port}")
     print("=" * 50)
     
     try:
-        # 直接运行streamlit命令，使用配置文件
+        # 设置环境变量
         env = os.environ.copy()
         env["STREAMLIT_SERVER_HEADLESS"] = "true"  # 禁用浏览器自动打开
+        env["STREAMLIT_SERVER_PORT"] = str(available_port)  # 设置动态端口
         
+        print(f"🌐 正在启动服务，请访问: http://localhost:{available_port}")
+        
+        # 直接在命令行参数中指定端口，确保端口一致性
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run", "app.py"
+            sys.executable, "-m", "streamlit", "run", "app.py",
+            "--server.port", str(available_port)
         ], env=env)
         return True
         
@@ -104,17 +135,6 @@ def main():
     if not os.path.exists("app.py"):
         print("❌ 未找到app.py文件，请确保在正确的目录中")
         return False
-    
-    # 显示自定义配置选项
-    print("\n🛠️  自定义配置选项:")
-    print("如果需要自定义模型配置，请在启动后选择 'Custom (OpenAI-Compatible)' 选项")
-    print("支持的自定义服务商:")
-    print("  • DeepSeek: https://api.deepseek.com/v1")
-    print("  • Groq: https://api.groq.com/openai/v1") 
-    print("  • Moonshot: https://api.moonshot.cn/v1")
-    print("  • 本地vLLM: http://localhost:8000/v1")
-    print("  • 本地Ollama: http://localhost:11434/v1")
-    print("=" * 60)
     
     # 激活虚拟环境并运行
     return activate_venv_and_run()

@@ -23,7 +23,7 @@ class LLMClient:
     def generate(self, system_prompt, user_prompt):
         """统一的生成接口，屏蔽不同厂商 SDK 的差异"""
         try:
-            if self.provider == "OpenAI" or self.provider == "Custom (OpenAI-Compatible)":
+            if self.provider == "OpenAI" or self.provider == "Custom":
                 client = OpenAI(api_key=self.api_key, base_url=self.base_url)
                 response = client.chat.completions.create(
                     model=self.model_name,
@@ -36,7 +36,7 @@ class LLMClient:
                 )
                 return response.choices[0].message.content
 
-            elif self.provider == "Anthropic (Claude)":
+            elif self.provider == "Anthropic":
                 client = anthropic.Anthropic(api_key=self.api_key)
                 message = client.messages.create(
                     model=self.model_name,
@@ -47,7 +47,7 @@ class LLMClient:
                 )
                 return message.content[0].text
 
-            elif self.provider == "Google (Gemini)":
+            elif self.provider == "Google":
                 genai.configure(api_key=self.api_key)
                 model = genai.GenerativeModel(
                     self.model_name,
@@ -72,60 +72,6 @@ def clean_json_text(text):
 
 st.set_page_config(page_title="AI 数据集蒸馏工厂", layout="wide", page_icon="🏭")
 
-# 添加自定义CSS样式
-st.markdown("""
-<style>
-/* 优化侧边栏样式 */
-.css-1d391kg {
-    padding: 1rem 1.5rem;
-}
-
-/* 优化标题样式 */
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    color: #1f4788;
-    font-weight: 600;
-}
-
-/* 优化容器样式 */
-.stContainer {
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 0.5rem 0;
-    background-color: #f8f9fa;
-}
-
-/* 优化按钮样式 */
-.stButton > button {
-    border-radius: 8px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.stButton > button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-/* 优化选择框样式 */
-.stSelectbox > div > div {
-    border-radius: 8px;
-}
-
-/* 优化输入框样式 */
-.stTextInput > div > div > input {
-    border-radius: 8px;
-    border: 1px solid #ccc;
-}
-
-/* 优化警告和成功消息 */
-.stAlert {
-    border-radius: 8px;
-    padding: 1rem;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.title("🏭 高质量数据集蒸馏工厂")
 st.markdown("利用强大的大模型（Teacher Model）生成用于微调（SFT）的高质量指令数据集。")
 
@@ -133,14 +79,9 @@ st.markdown("利用强大的大模型（Teacher Model）生成用于微调（SFT
 with st.sidebar:
     st.header("⚙️ 模型设置")
     
-    # 添加分隔线和说明
-    st.markdown("---")
-    st.markdown("🎯 **选择AI模型服务商**")
-    
     provider = st.selectbox(
-        "服务商",
-        ["OpenAI", "Anthropic (Claude)", "Google (Gemini)", "Custom (OpenAI-Compatible)"],
-        help="选择您要使用的AI模型服务商"
+        "选择模型服务商",
+        ["OpenAI", "Anthropic", "Google", "Custom"]
     )
 
     api_key = ""
@@ -149,129 +90,25 @@ with st.sidebar:
 
     # 动态显示配置项，优先读取 .env
     if provider == "OpenAI":
-        with st.container():
-            st.markdown("**🔑 认证配置**")
-            api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", help="您的OpenAI API密钥")
-            
-            st.markdown("**🤖 模型配置**")
-            model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"], help="选择OpenAI模型")
+        api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password")
+        model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"])
     
-    elif provider == "Anthropic (Claude)":
-        with st.container():
-            st.markdown("**🔑 认证配置**")
-            api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", help="您的Anthropic API密钥")
-            
-            st.markdown("**🤖 模型配置**")
-            model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"], help="选择Claude模型")
+    elif provider == "Anthropic":
+        api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password")
+        model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"])
         
-    elif provider == "Google (Gemini)":
-        with st.container():
-            st.markdown("**🔑 认证配置**")
-            api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", help="您的Google API密钥")
-            
-            st.markdown("**🤖 模型配置**")
-            model_name = st.selectbox("选择模型", ["gemini-1.5-pro", "gemini-1.5-flash"], help="选择Gemini模型")
+    elif provider == "Google":
+        api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password")
+        model_name = st.selectbox("选择模型", ["gemini-1.5-pro", "gemini-1.5-flash"])
         
-    elif provider == "Custom (OpenAI-Compatible)":
-        st.info("💡 适用于 DeepSeek, Groq, Moonshot 或 本地 vLLM/Ollama")
-        
-        # 移除容器包装，避免悬停时出现多余容器
-        # 使用容器来组织自定义配置
-        st.markdown("**🔧 服务器配置**")
-        
-        # 统一的URL输入框（自动解析端口）
-        base_url = st.text_input(
-            "Base URL", 
-            value=os.getenv("CUSTOM_BASE_URL", "https://api.openai.com/v1"), 
-            help="完整的API服务器地址，如：https://api.deepseek.com/v1 或 http://localhost:8000/v1"
-        )
-        
-        # URL解析和验证提示
-        if base_url:
-            import re
-            url_pattern = r'^(https?://)([^:/]+)(:(\d+))?(/.*)?$'
-            match = re.match(url_pattern, base_url)
-            
-            if match:
-                protocol, domain, _, port, path = match.groups()
-                port_display = f":{port}" if port else ""
-                st.info(f"📍 解析结果: {protocol}{domain}{port_display}{path or ''}")
-            else:
-                st.warning("⚠️ URL格式不正确，请检查输入")
-        
-        st.markdown("**🔑 认证配置**")
-        
-        # 第二行：API密钥（带显隐切换）
-        col_key, col_toggle = st.columns([4, 1])
-        with col_key:
-            if 'show_custom_key' not in st.session_state:
-                st.session_state.show_custom_key = False
-            
-            key_type = "text" if st.session_state.show_custom_key else "password"
-            api_key = st.text_input(
-                "API Key", 
-                value=os.getenv("CUSTOM_API_KEY", "sk-xxxx"), 
-                type=key_type,
-                help="您的API访问密钥"
-            )
-        
-        with col_toggle:
-            st.write("")  # 添加空行对齐
-            if st.button("👁️" if not st.session_state.show_custom_key else "🙈", 
-                       help="显示/隐藏密钥",
-                       key="toggle_custom_key"):
-                st.session_state.show_custom_key = not st.session_state.show_custom_key
-                st.rerun()
-        
-        st.markdown("**🤖 模型配置**")
-        
-        # 模型选择 - 分离布局
-        # 第一行：模型选择下拉菜单
-        preset_models = [
-            "llama3-70b", "llama3-8b", "deepseek-chat", "deepseek-coder", 
-            "mixtral-8x7b", "qwen-14b", "gpt-3.5-turbo", "gpt-4"
-        ]
-        selected_model = st.selectbox(
-            "选择模型", 
-            preset_models + ["自定义"],
-            help="选择预设模型或自定义输入"
-        )
-        
-        # 第二行：模型显示或自定义输入
-        if selected_model == "自定义":
-            model_name = st.text_input(
-                "自定义模型名称", 
-                value="custom-model",
-                help="输入您的自定义模型名称"
-            )
-        else:
-            # 显示当前选中的模型（只读）
-            st.text_input(
-                "当前模型", 
-                value=selected_model, 
-                disabled=True,
-                help="当前选中的模型"
-            )
-            model_name = selected_model
-    
-    # 快速配置提示
-    with st.expander("📚 快速配置指南"):
-            st.markdown("""
-            **常用配置示例：**
-            - **DeepSeek**: `https://api.deepseek.com/v1` + `deepseek-chat`
-            - **Groq**: `https://api.groq.com/openai/v1` + `mixtral-8x7b`
-            - **Moonshot**: `https://api.moonshot.cn/v1` + `moonshot-v1-8k`
-            - **本地vLLM**: `http://localhost:8000/v1` + 自定义模型名
-            - **本地Ollama**: `http://localhost:11434/v1` + 自定义模型名
-            """)
+    elif provider == "Custom":
+        st.info("适用于 DeepSeek, Groq, Moonshot 或 本地 vLLM/Ollama")
+        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", "https://api.openai.com/v1"))
+        api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", "sk-xxxx"), type="password")
+        model_name = st.text_input("Model Name", value="llama3-70b")
 
-    # 添加分隔线和状态提示
-    st.markdown("---")
-    
     if not api_key:
-        st.warning("⚠️ 请在 .env 文件中配置密钥或在上方输入", icon="🔑")
-    else:
-        st.success(f"✅ {provider} 配置就绪", icon="✨")
+        st.warning("⚠️ 请在 .env 文件中配置密钥或在上方输入")
 
 # --- 主界面逻辑 ---
 
