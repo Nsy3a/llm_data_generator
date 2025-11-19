@@ -1,0 +1,47 @@
+[theme]
+# 主题配置
+base = "light"
+primaryColor = "#FF6B6B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+[server]
+# 服务器配置
+port = 8501
+address = "localhost"
+enableCORS = true
+enableXsrfProtection = true
+headless = true
+maxUploadSize = 200
+
+[browser]
+# 浏览器配置
+gatherUsageStats = false  # 禁用使用统计收集
+
+[runner]
+# 运行配置
+magicEnabled = true
+installTracer = false
+disableWatchdogWarning = false
+
+[mapbox]
+# Mapbox配置（如使用地图功能）
+token = ""
+
+[deprecation]
+# 弃用警告配置
+showPyplotGlobalUse = false
+
+[s3]
+# S3配置（如使用文件上传）
+accessKeyId = ""
+secretAccessKey = ""
+bucket = ""
+region = ""
+
+[ui]
+# UI配置
+hideTopBar = false
+hideSidebarNav = false

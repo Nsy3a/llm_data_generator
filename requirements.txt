@@ -1,0 +1,22 @@
+# AI数据集蒸馏工厂 - 依赖库配置
+# 创建时间: 2024年12月19日
+# 国内安装建议使用: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Web应用框架
+streamlit>=1.28.0,<2.0.0
+
+# 环境变量管理
+python-dotenv>=1.0.0,<2.0.0
+
+# 大模型API客户端
+openai>=1.0.0,<2.0.0          # OpenAI GPT系列
+anthropic>=0.7.0,<1.0.0       # Anthropic Claude
+google-generativeai>=0.3.0,<1.0.0  # Google Gemini
+
+# 数据处理
+pandas>=1.5.0,<3.0.0
+
+# 辅助依赖（可选，根据需求安装）
+# numpy>=1.20.0          # 数值计算支持
+# matplotlib>=3.5.0      # 数据可视化
+# plotly>=5.0.0           # 交互式图表
