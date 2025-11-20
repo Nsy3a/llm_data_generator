@@ -13,6 +13,75 @@ load_dotenv()
 
 # ================== 后端逻辑：多模型适配器 ==================
 
+class PollinationsAIClient:
+    """Pollinations AI 客户端 - 支持文本和图像生成"""
+    def __init__(self, model_name="openai", model_type="text"):
+        self.base_url = "https://text.pollinations.ai" if model_type == "text" else "https://image.pollinations.ai"
+        self.model_name = model_name
+        self.model_type = model_type
+    
+    def generate_text(self, prompt, system_prompt=None, **kwargs):
+        """生成文本 - 使用Pollinations AI文本API"""
+        import requests
+        import urllib.parse
+        
+        # 构建完整的提示词
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n用户任务：{prompt}"
+        
+        # URL编码提示词
+        encoded_prompt = urllib.parse.quote(full_prompt)
+        
+        # 构建请求URL
+        url = f"{self.base_url}/prompt/{encoded_prompt}"
+        
+        # 添加参数
+        params = {"model": self.model_name}
+        if kwargs.get("seed"):
+            params["seed"] = kwargs["seed"]
+        if kwargs.get("private"):
+            params["private"] = "true"
+        
+        try:
+            response = requests.get(url, params=params, timeout=60)
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
+    def generate_image(self, prompt, **kwargs):
+        """生成图像 - 使用Pollinations AI图像API"""
+        import requests
+        import urllib.parse
+        
+        # URL编码提示词
+        encoded_prompt = urllib.parse.quote(prompt)
+        
+        # 构建请求URL
+        url = f"{self.base_url}/prompt/{encoded_prompt}"
+        
+        # 添加参数
+        params = {
+            "model": kwargs.get("model", "flux"),
+            "width": kwargs.get("width", 1024),
+            "height": kwargs.get("height", 1024),
+            "seed": kwargs.get("seed"),
+            "nologo": "true" if kwargs.get("nologo", False) else "false",
+            "private": "true" if kwargs.get("private", True) else "false",
+            "enhance": "true" if kwargs.get("enhance", False) else "false"
+        }
+        
+        # 移除None值
+        params = {k: v for k, v in params.items() if v is not None}
+        
+        try:
+            response = requests.get(url, params=params, timeout=300)
+            response.raise_for_status()
+            return response.content  # 返回图像二进制数据
+        except Exception as e:
+            return f"Error: {str(e)}"
+
 class LLMClient:
     def __init__(self, provider, api_key, base_url=None, model_name=None):
         self.provider = provider
@@ -23,7 +92,22 @@ class LLMClient:
     def generate(self, system_prompt, user_prompt):
         """统一的生成接口，屏蔽不同厂商 SDK 的差异"""
         try:
-            if self.provider == "OpenAI" or self.provider == "Custom":
+            if self.provider == "OpenAI":
+                client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+                response = client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.7,
+                    response_format={"type": "json_object"} # 尝试强制JSON模式
+                )
+                return response.choices[0].message.content
+
+            elif self.provider == "Custom":
+                if not self.base_url or not self.model_name:
+                    return f"Error: Custom provider requires both base_url and model_name to be configured"
                 client = OpenAI(api_key=self.api_key, base_url=self.base_url)
                 response = client.chat.completions.create(
                     model=self.model_name,
@@ -58,6 +142,17 @@ class LLMClient:
                 response = model.generate_content(full_prompt)
                 return response.text
 
+            elif self.provider == "Pollinations":
+                # 使用Pollinations AI生成文本
+                client = PollinationsAIClient(model_name=self.model_name, model_type="text")
+                # 构建额外参数
+                kwargs = {}
+                if hasattr(self, 'seed') and self.seed:
+                    kwargs['seed'] = self.seed
+                if hasattr(self, 'private') and self.private:
+                    kwargs['private'] = self.private
+                return client.generate_text(user_prompt, system_prompt, **kwargs)
+
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -81,7 +176,7 @@ with st.sidebar:
     
     provider = st.selectbox(
         "选择模型服务商",
-        ["OpenAI", "Anthropic", "Google", "Custom"]
+        ["OpenAI", "Anthropic", "Google", "Pollinations", "Custom"]
     )
 
     api_key = ""
@@ -90,24 +185,39 @@ with st.sidebar:
 
     # 动态显示配置项，优先读取 .env
     if provider == "OpenAI":
-        api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password")
+        api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx")
         model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"])
     
     elif provider == "Anthropic":
-        api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password")
+        api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", placeholder="sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx")
         model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"])
         
     elif provider == "Google":
-        api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password")
+        api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", placeholder="AIxxxxxxxxxxxxxxxxxxxxxxxx")
         model_name = st.selectbox("选择模型", ["gemini-1.5-pro", "gemini-1.5-flash"])
+        
+    elif provider == "Pollinations":
+        st.info("🌸 Pollinations AI - 免费无需注册的AI生成平台")
+        api_key = "pollinations"  # Pollinations AI不需要API密钥
+        
+        # 文本模型选择
+        text_models = ["openai", "mistral", "mistral-large", "claude", "gemini", 
+                      "llama", "llamaguard", "command", "searchgpt", "unity"]
+        model_name = st.selectbox("选择文本模型", text_models, help="选择用于文本生成的模型")
+        
+        # 高级参数配置
+        with st.expander("🔧 高级参数配置"):
+            st.write("**文本生成参数**:")
+            pollinations_seed = st.number_input("随机种子 (文本)", min_value=0, max_value=999999, value=0, help="0表示随机")
+            pollinations_private = st.checkbox("私有模式", value=True, help="生成的内容不显示在公共流中")
         
     elif provider == "Custom":
         st.info("适用于 DeepSeek, Groq, Moonshot 或 本地 vLLM/Ollama")
-        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", "https://api.openai.com/v1"))
-        api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", "sk-xxxx"), type="password")
-        model_name = st.text_input("Model Name", value="llama3-70b")
+        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", ""), placeholder="https://api.example.com/v1")
+        api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx")
+        model_name = st.text_input("Model Name", value="", placeholder="llama3-70b, deepseek-chat, gpt-4")
 
-    if not api_key:
+    if not api_key and provider != "Pollinations":
         st.warning("⚠️ 请在 .env 文件中配置密钥或在上方输入")
 
 # --- 主界面逻辑 ---
@@ -127,10 +237,19 @@ with col2:
     num_topics = st.number_input("生成主题数量", min_value=1, max_value=50, value=5)
 
 if st.button("🚀 生成任务分类树 (Taxonomy)"):
-    if not api_key:
+    if not api_key and provider != "Pollinations":
         st.error("请先配置 API Key")
     else:
         client = LLMClient(provider, api_key, base_url, model_name)
+        # 传递Pollinations AI的高级参数
+        if provider == "Pollinations":
+            client.seed = pollinations_seed if pollinations_seed > 0 else None
+            client = LLMClient(provider, api_key, base_url, model_name)
+        # 传递Pollinations AI的高级参数
+        if provider == "Pollinations":
+            client.seed = pollinations_seed if pollinations_seed > 0 else None
+            client.private = pollinations_private
+        
         with st.spinner(f"正在让 {model_name} 分析领域知识..."):
             system_prompt = "你是一位专家级数据架构师。请根据用户输入的领域，拆解出具体的细分任务场景。"
             user_prompt = f"""
@@ -166,6 +285,11 @@ if st.session_state.topics:
     
     if st.button("🔥 开始蒸馏数据"):
         client = LLMClient(provider, api_key, base_url, model_name)
+        # 传递Pollinations AI的高级参数
+        if provider == "PollinationsAI":
+            client.seed = pollinations_seed if pollinations_seed > 0 else None
+            client.private = pollinations_private
+        
         st.session_state.generated_data = [] # 清空旧数据
         
         progress_bar = st.progress(0)
@@ -243,3 +367,13 @@ if st.session_state.topics:
             file_name=f"dataset_{target_domain}.csv",
             mime="text/csv"
         )
+
+# 区域 4: Pollinations AI 图像生成 (已移除)
+# st.divider()
+# st.subheader("4. 🎨 AI 图像生成 (Pollinations AI)")
+# 
+# # 初始化图像生成状态
+# if "generated_images" not in st.session_state:
+#     st.session_state.generated_images = []
+#
+# ... (完整图像生成功能代码已注释移除)
