@@ -167,6 +167,41 @@ def clean_json_text(text):
 
 st.set_page_config(page_title="AI 数据集蒸馏工厂", layout="wide", page_icon="🏭")
 
+# 自定义CSS来调整密码输入框样式
+st.markdown("""
+<style>
+/* 密码输入框样式调整 */
+.stTextInput > div {
+    position: relative !important;
+}
+
+.stTextInput > div > div {
+    position: relative !important;
+}
+
+.stTextInput input[type="password"] {
+    right: 0px; !important;
+    position: relative !important;
+}
+
+/* 调整小眼睛按钮位置，继续往右移动 */
+.stTextInput > div > div > button[title*="password"] {
+    right: -12px !important;
+    position: relative !important;
+}
+
+/* 确保与下拉选择框的箭头垂直对齐 */
+.stSelectbox > div > div {
+    position: relative;
+}
+
+/* 调整下拉箭头位置，与密码框小眼睛图标垂直对齐 */
+.stSelectbox > div > div > div:last-child {
+    right: 0px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🏭 高质量数据集蒸馏工厂")
 st.markdown("利用强大的大模型（Teacher Model）生成用于微调（SFT）的高质量指令数据集。")
 
@@ -185,15 +220,15 @@ with st.sidebar:
 
     # 动态显示配置项，优先读取 .env
     if provider == "OpenAI":
-        api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx")
+        api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxx...")
         model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"])
     
     elif provider == "Anthropic":
-        api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", placeholder="sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx")
+        api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", placeholder="sk-ant-xxxxxxxxxxxxx...")
         model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"])
         
     elif provider == "Google":
-        api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", placeholder="AIxxxxxxxxxxxxxxxxxxxxxxxx")
+        api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", placeholder="AIxxxxxxxxxxxxxxxx...")
         model_name = st.selectbox("选择模型", ["gemini-1.5-pro", "gemini-1.5-flash"])
         
     elif provider == "Pollinations":
@@ -213,9 +248,9 @@ with st.sidebar:
         
     elif provider == "Custom":
         st.info("适用于 DeepSeek, Groq, Moonshot 或 本地 vLLM/Ollama")
-        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", ""), placeholder="https://api.example.com/v1")
-        api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx")
-        model_name = st.text_input("Model Name", value="", placeholder="llama3-70b, deepseek-chat, gpt-4")
+        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", ""), placeholder="https://api.example.com/...")
+        api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxx...")
+        model_name = st.text_input("Model Name", value="", placeholder="llama3-70b, gpt-4...")
 
     if not api_key and provider != "Pollinations":
         st.warning("⚠️ 请在 .env 文件中配置密钥或在上方输入")
@@ -253,7 +288,7 @@ if st.button("🚀 生成任务分类树 (Taxonomy)"):
         with st.spinner(f"正在让 {model_name} 分析领域知识..."):
             system_prompt = "你是一位专家级数据架构师。请根据用户输入的领域，拆解出具体的细分任务场景。"
             user_prompt = f"""
-            领域：{target_domain}
+            领域: {target_domain}
             请生成 {num_topics} 个具体的、高难度的细分任务。
             要求：输出严格的 JSON 格式，包含 'topics' 列表。
             
