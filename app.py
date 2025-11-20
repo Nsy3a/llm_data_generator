@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 import time
+import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 import anthropic
@@ -202,6 +203,147 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 获取OpenAI模型列表的函数
+def get_openai_models():
+    """从OpenAI API获取最新的模型列表"""
+    try:
+        # 使用OpenAI客户端获取模型列表
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+        models_response = client.models.list()
+        
+        # 筛选出聊天模型
+        chat_models = []
+        for model in models_response.data:
+            model_id = model.id
+            # 筛选出适合聊天的模型
+            if any(keyword in model_id for keyword in ["gpt", "chat"]):
+                chat_models.append({
+                    'display': model_id,
+                    'value': model_id,
+                    'description': f"OpenAI {model_id}"
+                })
+        
+        # 按名称排序
+        chat_models.sort(key=lambda x: x['display'])
+        return chat_models
+        
+    except Exception as e:
+        st.warning(f"获取OpenAI在线模型列表失败: {str(e)}，使用本地备份数据")
+        return get_local_openai_models()
+
+# 本地备份的OpenAI模型数据
+def get_local_openai_models():
+    """本地备份的OpenAI模型数据"""
+    return [
+        {'display': 'gpt-4o', 'value': 'gpt-4o', 'description': 'OpenAI GPT-4o'},
+        {'display': 'gpt-4o-mini', 'value': 'gpt-4o-mini', 'description': 'OpenAI GPT-4o Mini'},
+        {'display': 'gpt-4-turbo', 'value': 'gpt-4-turbo', 'description': 'OpenAI GPT-4 Turbo'},
+        {'display': 'gpt-3.5-turbo', 'value': 'gpt-3.5-turbo', 'description': 'OpenAI GPT-3.5 Turbo'}
+    ]
+
+# 获取Anthropic模型列表的函数
+def get_anthropic_models():
+    """从Anthropic API获取最新的模型列表"""
+    try:
+        # 使用Anthropic客户端获取模型列表
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        models_response = client.models.list()
+        
+        # 筛选出适合对话的模型
+        chat_models = []
+        for model in models_response.data:
+            model_id = model.id
+            # 筛选出Claude系列模型
+            if "claude" in model_id:
+                chat_models.append({
+                    'display': model_id,
+                    'value': model_id,
+                    'description': f"Anthropic {model_id}"
+                })
+        
+        # 按名称排序
+        chat_models.sort(key=lambda x: x['display'])
+        return chat_models
+        
+    except Exception as e:
+        st.warning(f"获取Anthropic在线模型列表失败: {str(e)}，使用本地备份数据")
+        return get_local_anthropic_models()
+
+# 本地备份的Anthropic模型数据
+def get_local_anthropic_models():
+    """本地备份的Anthropic模型数据"""
+    return [
+        {'display': 'claude-3-5-sonnet-20240620', 'value': 'claude-3-5-sonnet-20240620', 'description': 'Anthropic Claude 3.5 Sonnet'},
+        {'display': 'claude-3-opus-20240229', 'value': 'claude-3-opus-20240229', 'description': 'Anthropic Claude 3 Opus'},
+        {'display': 'claude-3-sonnet-20240229', 'value': 'claude-3-sonnet-20240229', 'description': 'Anthropic Claude 3 Sonnet'},
+        {'display': 'claude-3-haiku-20240307', 'value': 'claude-3-haiku-20240307', 'description': 'Anthropic Claude 3 Haiku'}
+    ]
+
+# 获取Google Gemini模型列表的函数
+def get_google_models():
+    """获取Google Gemini模型列表 - Google API不提供模型列表接口，使用本地配置"""
+    try:
+        # Google Generative AI没有提供获取模型列表的API
+        # 使用预定义的模型列表
+        return [
+            {'display': 'gemini-1.5-pro', 'value': 'gemini-1.5-pro', 'description': 'Google Gemini 1.5 Pro'},
+            {'display': 'gemini-1.5-flash', 'value': 'gemini-1.5-flash', 'description': 'Google Gemini 1.5 Flash'},
+            {'display': 'gemini-2.0-flash-exp', 'value': 'gemini-2.0-flash-exp', 'description': 'Google Gemini 2.0 Flash Experimental'},
+            {'display': 'gemini-2.0-flash-thinking-exp-1219', 'value': 'gemini-2.0-flash-thinking-exp-1219', 'description': 'Google Gemini 2.0 Flash Thinking'}
+        ]
+    except Exception as e:
+        st.warning(f"获取Google模型列表失败: {str(e)}，使用本地备份数据")
+        return get_local_google_models()
+
+# 本地备份的Google模型数据
+def get_local_google_models():
+    """本地备份的Google模型数据"""
+    return [
+        {'display': 'gemini-1.5-pro', 'value': 'gemini-1.5-pro', 'description': 'Google Gemini 1.5 Pro'},
+        {'display': 'gemini-1.5-flash', 'value': 'gemini-1.5-flash', 'description': 'Google Gemini 1.5 Flash'},
+        {'display': 'gemini-2.0-flash-exp', 'value': 'gemini-2.0-flash-exp', 'description': 'Google Gemini 2.0 Flash Experimental'},
+        {'display': 'gemini-2.0-flash-thinking-exp-1219', 'value': 'gemini-2.0-flash-thinking-exp-1219', 'description': 'Google Gemini 2.0 Flash Thinking'}
+    ]
+
+# 获取Pollinations AI模型列表的函数
+def get_pollinations_models():
+    """从Pollinations AI API获取最新的模型列表"""
+    try:
+        response = requests.get("https://text.pollinations.ai/models", timeout=5)
+        if response.status_code == 200:
+            models_data = response.json()
+            # 构建模型选择列表，显示完整描述，使用name作为实际值
+            model_options = []
+            for model in models_data:
+                display_name = model['description']
+                model_options.append({
+                    'display': display_name,
+                    'value': model['name'],
+                    'description': model.get('description', model['name'])
+                })
+            return model_options
+        else:
+            st.warning("无法从在线API获取模型列表，使用本地备份数据")
+            return get_local_pollinations_models()
+    except Exception as e:
+        st.warning(f"获取在线模型列表失败: {str(e)}，使用本地备份数据")
+        return get_local_pollinations_models()
+
+# 本地备份的模型数据
+def get_local_pollinations_models():
+    """本地备份的模型数据"""
+    return [
+        {'display': 'DeepSeek V3.1', 'value': 'deepseek', 'description': 'DeepSeek V3.1'},
+        {'display': 'Gemini 2.5 Flash Lite', 'value': 'gemini', 'description': 'Gemini 2.5 Flash Lite'},
+        {'display': 'Gemini 2.5 Flash Lite with Google Search', 'value': 'gemini-search', 'description': 'Gemini 2.5 Flash Lite with Google Search'},
+        {'display': 'Mistral Small 3.2 24B', 'value': 'mistral', 'description': 'Mistral Small 3.2 24B'},
+        {'display': 'OpenAI GPT', 'value': 'openai', 'description': 'OpenAI GPT'},
+        {'display': 'Llama 3.2 3B', 'value': 'llama', 'description': 'Llama 3.2 3B'},
+        {'display': 'LlamaGuard 7B', 'value': 'llamaguard', 'description': 'LlamaGuard 7B'},
+        {'display': 'Cohere Command', 'value': 'command', 'description': 'Cohere Command'},
+        {'display': 'Unity', 'value': 'unity', 'description': 'Unity'}
+    ]
+
 st.title("🏭 高质量数据集蒸馏工厂")
 st.markdown("利用强大的大模型（Teacher Model）生成用于微调（SFT）的高质量指令数据集。")
 
@@ -211,7 +353,8 @@ with st.sidebar:
     
     provider = st.selectbox(
         "选择模型服务商",
-        ["OpenAI", "Anthropic", "Google", "Pollinations", "Custom"]
+        ["Pollinations", "OpenAI", "Anthropic", "Google", "Custom"],
+        index=0
     )
 
     api_key = ""
@@ -221,24 +364,68 @@ with st.sidebar:
     # 动态显示配置项，优先读取 .env
     if provider == "OpenAI":
         api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxx...")
-        model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"])
+        
+        # 获取OpenAI模型列表（在线优先，失败时使用本地备份）
+        if api_key:
+            try:
+                openai_models = get_openai_models()
+                # 提取显示名称用于选择框
+                display_names = [model['display'] for model in openai_models]
+                selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的OpenAI模型")
+                
+                # 根据选择的显示名称找到对应的实际模型值
+                model_name = next(model['value'] for model in openai_models if model['display'] == selected_display)
+            except Exception as e:
+                st.error(f"获取OpenAI模型列表失败: {str(e)}")
+                model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"])
+        else:
+            model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"])
     
     elif provider == "Anthropic":
         api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", placeholder="sk-ant-xxxxxxxxxxxxx...")
-        model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"])
+        
+        # 获取Anthropic模型列表（在线优先，失败时使用本地备份）
+        if api_key:
+            try:
+                anthropic_models = get_anthropic_models()
+                # 提取显示名称用于选择框
+                display_names = [model['display'] for model in anthropic_models]
+                selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Anthropic模型")
+                
+                # 根据选择的显示名称找到对应的实际模型值
+                model_name = next(model['value'] for model in anthropic_models if model['display'] == selected_display)
+            except Exception as e:
+                st.error(f"获取Anthropic模型列表失败: {str(e)}")
+                model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"])
+        else:
+            model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"])
         
     elif provider == "Google":
         api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", placeholder="AIxxxxxxxxxxxxxxxx...")
-        model_name = st.selectbox("选择模型", ["gemini-1.5-pro", "gemini-1.5-flash"])
+        
+        # 获取Google模型列表（Google API不提供模型列表，使用预定义列表）
+        google_models = get_google_models()
+        # 提取显示名称用于选择框
+        display_names = [model['display'] for model in google_models]
+        selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Google Gemini模型")
+        
+        # 根据选择的显示名称找到对应的实际模型值
+        model_name = next(model['value'] for model in google_models if model['display'] == selected_display)
         
     elif provider == "Pollinations":
         st.info("🌸 Pollinations AI - 免费无需注册的AI生成平台")
         api_key = "pollinations"  # Pollinations AI不需要API密钥
         
-        # 文本模型选择
-        text_models = ["openai", "mistral", "mistral-large", "claude", "gemini", 
-                      "llama", "llamaguard", "command", "searchgpt", "unity"]
-        model_name = st.selectbox("选择文本模型", text_models, help="选择用于文本生成的模型")
+        # 获取模型列表（在线优先，失败时使用本地备份）
+        model_options = get_pollinations_models()
+        
+        # 提取显示名称和实际值用于选择框
+        display_names = [model['display'] for model in model_options]
+        selected_display = st.selectbox("选择文本模型", display_names, help="选择用于文本生成的模型")
+        
+        # 根据选择的显示名称找到对应的实际模型值
+        selected_model = next(model['value'] for model in model_options if model['display'] == selected_display)
+        model_name = selected_model
         
         # 高级参数配置
         with st.expander("🔧 高级参数配置"):
@@ -247,10 +434,17 @@ with st.sidebar:
             pollinations_private = st.checkbox("私有模式", value=True, help="生成的内容不显示在公共流中")
         
     elif provider == "Custom":
-        st.info("适用于 DeepSeek, Groq, Moonshot 或 本地 vLLM/Ollama")
-        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", ""), placeholder="https://api.example.com/...")
+        st.info("完全自定义模型服务商配置")
+        
+        # 服务商名称输入
+        custom_provider_name = st.text_input("服务商名称", value=os.getenv("CUSTOM_PROVIDER_NAME", ""), placeholder="如：DeepSeek、Groq、Moonshot、Ollama等")
+        
+        # 基础配置
+        base_url = st.text_input("Base URL", value=os.getenv("CUSTOM_BASE_URL", ""), placeholder="https://api.example.com/v1")
         api_key = st.text_input("API Key", value=os.getenv("CUSTOM_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxx...")
-        model_name = st.text_input("Model Name", value="", placeholder="llama3-70b, gpt-4...")
+        
+        # 完全自定义模型名称
+        model_name = st.text_input("模型名称", value=os.getenv("CUSTOM_MODEL_NAME", ""), placeholder="输入完整的模型名称，如：deepseek-chat、llama3-70b、gpt-3.5-turbo等")
 
     if not api_key and provider != "Pollinations":
         st.warning("⚠️ 请在 .env 文件中配置密钥或在上方输入")
@@ -276,10 +470,6 @@ if st.button("🚀 生成任务分类树 (Taxonomy)"):
         st.error("请先配置 API Key")
     else:
         client = LLMClient(provider, api_key, base_url, model_name)
-        # 传递Pollinations AI的高级参数
-        if provider == "Pollinations":
-            client.seed = pollinations_seed if pollinations_seed > 0 else None
-            client = LLMClient(provider, api_key, base_url, model_name)
         # 传递Pollinations AI的高级参数
         if provider == "Pollinations":
             client.seed = pollinations_seed if pollinations_seed > 0 else None
@@ -321,7 +511,7 @@ if st.session_state.topics:
     if st.button("🔥 开始蒸馏数据"):
         client = LLMClient(provider, api_key, base_url, model_name)
         # 传递Pollinations AI的高级参数
-        if provider == "PollinationsAI":
+        if provider == "Pollinations":
             client.seed = pollinations_seed if pollinations_seed > 0 else None
             client.private = pollinations_private
         
@@ -403,12 +593,4 @@ if st.session_state.topics:
             mime="text/csv"
         )
 
-# 区域 4: Pollinations AI 图像生成 (已移除)
-# st.divider()
-# st.subheader("4. 🎨 AI 图像生成 (Pollinations AI)")
-# 
-# # 初始化图像生成状态
-# if "generated_images" not in st.session_state:
-#     st.session_state.generated_images = []
-#
-# ... (完整图像生成功能代码已注释移除)
+# 应用结束
