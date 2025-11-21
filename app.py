@@ -181,7 +181,7 @@ st.markdown("""
 }
 
 .stTextInput input[type="password"] {
-    right: 0px; !important;
+    right: 0px !important;
     position: relative !important;
 }
 
@@ -365,16 +365,48 @@ with st.sidebar:
     if provider == "OpenAI":
         api_key = st.text_input("API Key", value=os.getenv("OPENAI_API_KEY", ""), type="password", placeholder="sk-xxxxxxxxxxxxxxxx...")
         
-        # 获取OpenAI模型列表（在线优先，失败时使用本地备份）
+        # 初始化session state用于跟踪模型加载状态
+        if "openai_loading" not in st.session_state:
+            st.session_state.openai_loading = False
+        if "openai_models" not in st.session_state:
+            st.session_state.openai_models = []
+        
+        # 只有在切换到OpenAI且有API密钥时才触发自动获取模型列表
+        if api_key and ("last_provider" not in st.session_state or st.session_state.last_provider != "OpenAI"):
+            st.session_state.last_provider = "OpenAI"
+            st.session_state.openai_loading = True
+            
+            # 使用spinner显示加载动画
+            with st.spinner("🔍 正在获取OpenAI模型列表..."):
+                try:
+                    openai_models = get_openai_models()
+                    st.session_state.openai_models = openai_models
+                    st.session_state.openai_loading = False
+                except Exception as e:
+                    st.error(f"获取OpenAI模型列表失败: {str(e)}")
+                    st.session_state.openai_models = []
+                    st.session_state.openai_loading = False
+        
+        # 获取OpenAI模型列表
         if api_key:
             try:
-                openai_models = get_openai_models()
-                # 提取显示名称用于选择框
-                display_names = [model['display'] for model in openai_models]
-                selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的OpenAI模型")
-                
-                # 根据选择的显示名称找到对应的实际模型值
-                model_name = next(model['value'] for model in openai_models if model['display'] == selected_display)
+                if st.session_state.openai_loading:
+                    # 如果正在加载，显示基础模型选项
+                    display_names = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的OpenAI模型")
+                    model_name = selected_display
+                elif st.session_state.openai_models:
+                    # 使用已加载的模型列表
+                    openai_models = st.session_state.openai_models
+                    display_names = [model['display'] for model in openai_models]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的OpenAI模型")
+                    model_name = next(model['value'] for model in openai_models if model['display'] == selected_display)
+                else:
+                    # 实时获取模型列表
+                    openai_models = get_openai_models()
+                    display_names = [model['display'] for model in openai_models]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的OpenAI模型")
+                    model_name = next(model['value'] for model in openai_models if model['display'] == selected_display)
             except Exception as e:
                 st.error(f"获取OpenAI模型列表失败: {str(e)}")
                 model_name = st.selectbox("选择模型", ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"])
@@ -384,16 +416,48 @@ with st.sidebar:
     elif provider == "Anthropic":
         api_key = st.text_input("API Key", value=os.getenv("ANTHROPIC_API_KEY", ""), type="password", placeholder="sk-ant-xxxxxxxxxxxxx...")
         
-        # 获取Anthropic模型列表（在线优先，失败时使用本地备份）
+        # 初始化session state用于跟踪模型加载状态
+        if "anthropic_loading" not in st.session_state:
+            st.session_state.anthropic_loading = False
+        if "anthropic_models" not in st.session_state:
+            st.session_state.anthropic_models = []
+        
+        # 只有在切换到Anthropic且有API密钥时才触发自动获取模型列表
+        if api_key and ("last_provider" not in st.session_state or st.session_state.last_provider != "Anthropic"):
+            st.session_state.last_provider = "Anthropic"
+            st.session_state.anthropic_loading = True
+            
+            # 使用spinner显示加载动画
+            with st.spinner("🔍 正在获取Anthropic模型列表..."):
+                try:
+                    anthropic_models = get_anthropic_models()
+                    st.session_state.anthropic_models = anthropic_models
+                    st.session_state.anthropic_loading = False
+                except Exception as e:
+                    st.error(f"获取Anthropic模型列表失败: {str(e)}")
+                    st.session_state.anthropic_models = []
+                    st.session_state.anthropic_loading = False
+        
+        # 获取Anthropic模型列表
         if api_key:
             try:
-                anthropic_models = get_anthropic_models()
-                # 提取显示名称用于选择框
-                display_names = [model['display'] for model in anthropic_models]
-                selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Anthropic模型")
-                
-                # 根据选择的显示名称找到对应的实际模型值
-                model_name = next(model['value'] for model in anthropic_models if model['display'] == selected_display)
+                if st.session_state.anthropic_loading:
+                    # 如果正在加载，显示基础模型选项
+                    display_names = ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Anthropic模型")
+                    model_name = selected_display
+                elif st.session_state.anthropic_models:
+                    # 使用已加载的模型列表
+                    anthropic_models = st.session_state.anthropic_models
+                    display_names = [model['display'] for model in anthropic_models]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Anthropic模型")
+                    model_name = next(model['value'] for model in anthropic_models if model['display'] == selected_display)
+                else:
+                    # 实时获取模型列表
+                    anthropic_models = get_anthropic_models()
+                    display_names = [model['display'] for model in anthropic_models]
+                    selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Anthropic模型")
+                    model_name = next(model['value'] for model in anthropic_models if model['display'] == selected_display)
             except Exception as e:
                 st.error(f"获取Anthropic模型列表失败: {str(e)}")
                 model_name = st.selectbox("选择模型", ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"])
@@ -403,8 +467,44 @@ with st.sidebar:
     elif provider == "Google":
         api_key = st.text_input("API Key", value=os.getenv("GOOGLE_API_KEY", ""), type="password", placeholder="AIxxxxxxxxxxxxxxxx...")
         
-        # 获取Google模型列表（Google API不提供模型列表，使用预定义列表）
-        google_models = get_google_models()
+        # 初始化session state用于跟踪模型加载状态
+        if "google_loading" not in st.session_state:
+            st.session_state.google_loading = False
+        if "google_models" not in st.session_state:
+            st.session_state.google_models = []
+        
+        # 只有在切换到Google时才触发自动获取模型列表
+        if "last_provider" not in st.session_state or st.session_state.last_provider != "Google":
+            st.session_state.last_provider = "Google"
+            st.session_state.google_loading = True
+            
+            # 使用spinner显示加载动画
+            with st.spinner("🔍 正在获取Google模型列表..."):
+                try:
+                    google_models = get_google_models()
+                    st.session_state.google_models = google_models
+                    st.session_state.google_loading = False
+                except Exception as e:
+                    st.error(f"获取Google模型列表失败: {str(e)}")
+                    st.session_state.google_models = []
+                    st.session_state.google_loading = False
+        
+        # 获取Google模型列表
+        if st.session_state.google_loading:
+            # 如果正在加载，显示基础模型选项
+            google_models = [
+                {'display': 'Gemini 2.5 Pro', 'value': 'gemini-2.5-pro', 'description': 'Gemini 2.5 Pro'},
+                {'display': 'Gemini 2.5 Flash', 'value': 'gemini-2.5-flash', 'description': 'Gemini 2.5 Flash'},
+                {'display': 'Gemini 2.0 Flash', 'value': 'gemini-2.0-flash', 'description': 'Gemini 2.0 Flash'},
+                {'display': 'Gemini 1.5 Pro', 'value': 'gemini-1.5-pro', 'description': 'Gemini 1.5 Pro'}
+            ]
+        elif st.session_state.google_models:
+            # 使用已加载的模型列表
+            google_models = st.session_state.google_models
+        else:
+            # 默认获取模型列表
+            google_models = get_google_models()
+        
         # 提取显示名称用于选择框
         display_names = [model['display'] for model in google_models]
         selected_display = st.selectbox("选择模型", display_names, help="选择用于文本生成的Google Gemini模型")
@@ -416,8 +516,39 @@ with st.sidebar:
         st.info("🌸 Pollinations AI - 免费无需注册的AI生成平台")
         api_key = "pollinations"  # Pollinations AI不需要API密钥
         
-        # 获取模型列表（在线优先，失败时使用本地备份）
-        model_options = get_pollinations_models()
+        # 初始化session state用于跟踪模型加载状态
+        if "pollinations_loading" not in st.session_state:
+            st.session_state.pollinations_loading = False
+        if "pollinations_models" not in st.session_state:
+            st.session_state.pollinations_models = []
+        
+        # 只有在切换到Pollinations时才触发自动获取模型列表
+        if "last_provider" not in st.session_state or st.session_state.last_provider != "Pollinations":
+            st.session_state.last_provider = "Pollinations"
+            st.session_state.pollinations_loading = True
+            
+            # 使用spinner显示加载动画
+            with st.spinner("🌸 正在获取Pollinations模型列表..."):
+                try:
+                    model_options = get_pollinations_models()
+                    st.session_state.pollinations_models = model_options
+                    st.session_state.pollinations_loading = False
+                except Exception as e:
+                    st.error(f"获取模型列表失败: {str(e)}")
+                    st.session_state.pollinations_models = get_local_pollinations_models()
+                    st.session_state.pollinations_loading = False
+        
+        # 如果正在加载，显示加载状态
+        if st.session_state.pollinations_loading:
+            st.info("🔄 正在获取模型列表...")
+            # 使用本地备份数据作为临时选项
+            model_options = get_local_pollinations_models()
+        elif st.session_state.pollinations_models:
+            # 使用已加载的模型列表
+            model_options = st.session_state.pollinations_models
+        else:
+            # 默认获取模型列表
+            model_options = get_pollinations_models()
         
         # 提取显示名称和实际值用于选择框
         display_names = [model['display'] for model in model_options]
